@@ -4,6 +4,7 @@ import { useUsersStore } from '../stores/users';
 import { useForumsStore } from '../stores/forums';
 import { useAuthStore } from '../stores/auth';
 import type { User, Forum } from '../types';
+import { usersApi } from '../api';
 
 const usersStore = useUsersStore();
 const forumsStore = useForumsStore();
@@ -19,6 +20,8 @@ const userForm = ref({
   role: '',
   isActive: true,
 });
+const newPassword = ref('');
+const showPasswordField = ref(false);
 
 const showForumModal = ref(false);
 const editingForum = ref<Forum | null>(null);
@@ -41,6 +44,8 @@ function openUserModal(user: User) {
     role: user.role,
     isActive: user.isActive,
   };
+  newPassword.value = '';
+  showPasswordField.value = false;
   showUserModal.value = true;
 }
 
@@ -59,6 +64,16 @@ async function saveUser() {
 
     if (userForm.value.isActive !== editingUser.value.isActive) {
       await usersStore.setActiveStatus(editingUser.value.id, userForm.value.isActive);
+    }
+
+    // Handle password change if provided
+    if (showPasswordField.value && newPassword.value.trim()) {
+      if (newPassword.value.length < 6) {
+        alert('Password must be at least 6 characters');
+        return;
+      }
+      await usersApi.changePassword(editingUser.value.id, newPassword.value);
+      alert('Password updated successfully');
     }
 
     showUserModal.value = false;
@@ -259,6 +274,28 @@ function formatDate(date: string) {
               Active
             </label>
           </div>
+          
+          <!-- Password Reset Section -->
+          <div class="password-section">
+            <button 
+              type="button" 
+              class="btn btn-secondary btn-sm" 
+              @click="showPasswordField = !showPasswordField"
+            >
+              {{ showPasswordField ? 'Cancel Password Change' : 'Change Password' }}
+            </button>
+            
+            <div v-if="showPasswordField" class="form-group" style="margin-top: 0.75rem;">
+              <label for="newPassword">New Password</label>
+              <input 
+                id="newPassword" 
+                v-model="newPassword" 
+                type="password" 
+                placeholder="Enter new password (min 6 characters)"
+              />
+            </div>
+          </div>
+          
           <div class="modal-actions">
             <button type="button" class="btn btn-secondary" @click="showUserModal = false">
               Cancel

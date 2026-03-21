@@ -55,9 +55,17 @@ namespace TaskManagerAPI.Services
                 .Take(pageSize)
                 .ToListAsync();
 
+            // Get reply counts for all tasks in one query for efficiency
+            var taskIds = tasks.Select(t => t.Id).ToList();
+            var replyCounts = await _context.Replies
+                .Where(r => taskIds.Contains(r.TaskId))
+                .GroupBy(r => r.TaskId)
+                .Select(g => new { TaskId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.TaskId, x => x.Count);
+
             return new TaskListDto
             {
-                Tasks = tasks.Select(MapToTaskDto).ToList(),
+                Tasks = tasks.Select(t => MapToTaskDto(t, replyCounts.GetValueOrDefault(t.Id, 0))).ToList(),
                 TotalCount = totalCount,
                 Page = page,
                 PageSize = pageSize
@@ -165,7 +173,7 @@ namespace TaskManagerAPI.Services
             return true;
         }
 
-        private static TaskDto MapToTaskDto(TaskItem task)
+        private static TaskDto MapToTaskDto(TaskItem task, int replyCount = 0)
         {
             return new TaskDto
             {
@@ -184,7 +192,7 @@ namespace TaskManagerAPI.Services
                 UpdatedAt = task.UpdatedAt,
                 DueDate = task.DueDate,
                 Attachments = task.Attachments?.Select(MapToAttachmentDto).ToList() ?? new List<AttachmentDto>(),
-                ReplyCount = task.Replies?.Count ?? 0
+                ReplyCount = replyCount
             };
         }
 

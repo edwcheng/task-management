@@ -103,6 +103,25 @@ namespace TaskManagerAPI.Controllers
             return NoContent();
         }
 
+        [HttpPut("{id}/password")]
+        [Authorize(Roles = "Admin")]
+        public async Task<ActionResult> ChangeUserPassword(int id, [FromBody] ChangePasswordRequest request)
+        {
+            var currentUserId = GetCurrentUserId();
+
+            if (string.IsNullOrWhiteSpace(request.NewPassword) || request.NewPassword.Length < 6)
+            {
+                return BadRequest(new { message = "Password must be at least 6 characters" });
+            }
+
+            var result = await _userService.ChangeUserPasswordAsync(id, request.NewPassword, currentUserId!.Value);
+            if (!result)
+            {
+                return BadRequest(new { message = "Cannot change this user's password" });
+            }
+            return NoContent();
+        }
+
         private int? GetCurrentUserId()
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -138,5 +157,10 @@ namespace TaskManagerAPI.Controllers
     public class SetActiveRequest
     {
         public bool IsActive { get; set; }
+    }
+
+    public class ChangePasswordRequest
+    {
+        public string NewPassword { get; set; } = string.Empty;
     }
 }

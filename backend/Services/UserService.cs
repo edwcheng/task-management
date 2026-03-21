@@ -13,6 +13,7 @@ namespace TaskManagerAPI.Services
         Task<bool> DeleteUserAsync(int id, int currentUserId, bool isAdmin);
         Task<bool> SetUserRoleAsync(int id, UserRole role, int currentUserId);
         Task<bool> SetUserActiveStatusAsync(int id, bool isActive, int currentUserId);
+        Task<bool> ChangeUserPasswordAsync(int id, string newPassword, int currentUserId);
     }
 
     public class UserService : IUserService
@@ -110,6 +111,24 @@ namespace TaskManagerAPI.Services
             if (user == null) return false;
 
             user.IsActive = isActive;
+            await _context.SaveChangesAsync();
+
+            return true;
+        }
+
+        public async Task<bool> ChangeUserPasswordAsync(int id, string newPassword, int currentUserId)
+        {
+            // Only admin can change another user's password
+            var currentUser = await _context.Users.FindAsync(currentUserId);
+            if (currentUser == null || currentUser.Role != UserRole.Admin)
+            {
+                return false;
+            }
+
+            var user = await _context.Users.FindAsync(id);
+            if (user == null) return false;
+
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
             await _context.SaveChangesAsync();
 
             return true;

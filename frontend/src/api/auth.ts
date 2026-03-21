@@ -40,4 +40,8 @@ export const usersApi = {
   setActiveStatus: async (id: number, isActive: boolean): Promise<void> => {
     await apiClient.put(`/users/${id}/active`, { isActive });
   },
+
+  changePassword: async (id: number, newPassword: string): Promise<void> => {
+    await apiClient.put(`/users/${id}/password`, { newPassword });
+  },
 };
