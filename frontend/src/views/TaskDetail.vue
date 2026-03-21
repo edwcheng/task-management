@@ -164,6 +164,15 @@ async function deleteAttachment(attachmentId: number) {
   }
 }
 
+async function downloadAttachment(attachmentId: number, fileName: string) {
+  try {
+    await attachmentsApi.download(attachmentId, fileName);
+  } catch (error) {
+    console.error('Failed to download attachment:', error);
+    alert('Failed to download attachment. Please try again.');
+  }
+}
+
 function canEditReply(reply: Reply): boolean {
   if (!authStore.user) return false;
   return authStore.isAdmin || reply.userId === authStore.user.id;
@@ -290,15 +299,14 @@ function formatDate(date: string) {
             :key="attachment.id" 
             class="attachment-item"
           >
-            <a
-              :href="`/api/attachments/${attachment.id}/download`"
+            <span
               class="attachment-link"
-              target="_blank"
+              @click="downloadAttachment(attachment.id, attachment.fileName)"
             >
               <span class="file-icon">📄</span>
               <span class="file-name">{{ attachment.fileName }}</span>
               <span class="file-size">{{ (attachment.fileSize / 1024).toFixed(1) }} KB</span>
-            </a>
+            </span>
             <button 
               v-if="canEdit()" 
               class="delete-attachment-btn" 
@@ -642,6 +650,7 @@ function formatDate(date: string) {
   color: #333;
   flex: 1;
   transition: color 0.2s;
+  cursor: pointer;
 }
 
 .attachment-link:hover {

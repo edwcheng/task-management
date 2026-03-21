@@ -24,6 +24,23 @@ export const attachmentsApi = {
     return response.data;
   },
 
+  download: async (id: number, fileName: string): Promise<void> => {
+    const response = await apiClient.get(`/attachments/${id}/download`, {
+      responseType: 'blob',
+    });
+    
+    // Create blob URL and trigger download
+    const blob = new Blob([response.data]);
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  },
+
   getDownloadUrl: (id: number): string => {
     return `${API_BASE_URL}/attachments/${id}/download`;
   },
