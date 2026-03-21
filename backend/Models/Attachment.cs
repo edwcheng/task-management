@@ -12,10 +12,10 @@ namespace TaskManagerAPI.Models
         [StringLength(255)]
         public string FileName { get; set; } = string.Empty;
 
-        // Store file data directly in database for Railway compatibility
+        // File data stored in database (for Railway compatibility)
         public byte[]? FileData { get; set; }
 
-        // FilePath kept for legacy/backward compatibility
+        // File path (nullable - not used when FileData is populated)
         [StringLength(500)]
         public string? FilePath { get; set; }
 

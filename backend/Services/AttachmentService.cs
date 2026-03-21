@@ -48,17 +48,17 @@ namespace TaskManagerAPI.Services
                     return null;
             }
 
-            // Read file data into memory
+            // Read file data into memory for database storage
             using var memoryStream = new MemoryStream();
             await file.CopyToAsync(memoryStream);
             var fileData = memoryStream.ToArray();
 
-            // Create database record with file data stored directly
+            // Create database record with file data
             var attachment = new Attachment
             {
                 FileName = file.FileName,
                 FileData = fileData,
-                FilePath = null, // No longer using filesystem
+                FilePath = null,
                 ContentType = file.ContentType,
                 FileSize = file.Length,
                 TaskId = taskId,
@@ -69,7 +69,7 @@ namespace TaskManagerAPI.Services
             _context.Attachments.Add(attachment);
             await _context.SaveChangesAsync();
 
-            _logger.LogInformation("Attachment {Id} uploaded successfully ({Size} bytes)", attachment.Id, attachment.FileSize);
+            _logger.LogInformation("Attachment {Id} uploaded ({Size} bytes)", attachment.Id, attachment.FileSize);
 
             return new AttachmentDto
             {
@@ -89,26 +89,26 @@ namespace TaskManagerAPI.Services
                 var attachment = await _context.Attachments.FindAsync(id);
                 if (attachment == null)
                 {
-                    _logger.LogWarning("Attachment {Id} not found in database", id);
+                    _logger.LogWarning("Attachment {Id} not found", id);
                     return null;
                 }
 
-                // First check if file data is stored in database (new method)
+                // Check database storage first
                 if (attachment.FileData != null && attachment.FileData.Length > 0)
                 {
-                    _logger.LogInformation("Serving attachment {Id} from database ({Size} bytes)", id, attachment.FileData.Length);
+                    _logger.LogInformation("Serving attachment {Id} from database", id);
                     return (attachment.FileData, attachment.ContentType, attachment.FileName);
                 }
 
-                // Fallback to file system (legacy support)
+                // Fallback to filesystem
                 if (!string.IsNullOrEmpty(attachment.FilePath) && File.Exists(attachment.FilePath))
                 {
-                    _logger.LogInformation("Serving attachment {Id} from filesystem: {Path}", id, attachment.FilePath);
+                    _logger.LogInformation("Serving attachment {Id} from filesystem", id);
                     var data = await File.ReadAllBytesAsync(attachment.FilePath);
                     return (data, attachment.ContentType, attachment.FileName);
                 }
 
-                _logger.LogWarning("Attachment {Id} has no data (FileData is null and file not found on disk)", id);
+                _logger.LogWarning("Attachment {Id} has no data", id);
                 return null;
             }
             catch (Exception ex)
@@ -137,13 +137,12 @@ namespace TaskManagerAPI.Services
             if (!isAdmin && !isOwner)
                 return false;
 
-            // Delete file from filesystem if exists (legacy support)
+            // Delete file from filesystem if exists
             if (!string.IsNullOrEmpty(attachment.FilePath) && File.Exists(attachment.FilePath))
             {
                 File.Delete(attachment.FilePath);
             }
 
-            // Remove database record (FileData is deleted automatically)
             _context.Attachments.Remove(attachment);
             await _context.SaveChangesAsync();
 
