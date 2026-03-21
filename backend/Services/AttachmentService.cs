@@ -93,12 +93,35 @@ namespace TaskManagerAPI.Services
 
         public async Task<(byte[]? Data, string? ContentType, string? FileName)?> DownloadAttachmentAsync(int id)
         {
-            var attachment = await _context.Attachments.FindAsync(id);
-            if (attachment == null || !File.Exists(attachment.FilePath))
-                return null;
+            try
+            {
+                var attachment = await _context.Attachments.FindAsync(id);
+                if (attachment == null)
+                {
+                    _logger.LogWarning("Attachment {Id} not found in database", id);
+                    return null;
+                }
 
-            var data = await File.ReadAllBytesAsync(attachment.FilePath);
-            return (data, attachment.ContentType, attachment.FileName);
+                if (string.IsNullOrEmpty(attachment.FilePath))
+                {
+                    _logger.LogWarning("Attachment {Id} has no file path", id);
+                    return null;
+                }
+
+                if (!File.Exists(attachment.FilePath))
+                {
+                    _logger.LogWarning("Attachment file not found on disk: {FilePath}", attachment.FilePath);
+                    return null;
+                }
+
+                var data = await File.ReadAllBytesAsync(attachment.FilePath);
+                return (data, attachment.ContentType, attachment.FileName);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error downloading attachment {Id}", id);
+                return null;
+            }
         }
 
         public async Task<bool> DeleteAttachmentAsync(int id, int userId, bool isAdmin)
