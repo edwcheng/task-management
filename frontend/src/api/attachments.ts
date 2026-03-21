@@ -24,8 +24,8 @@ export const attachmentsApi = {
     return response.data;
   },
 
-  getDownloadUrl: (_id: number): string => {
-    return `${API_BASE_URL}/attachments/${_id}/download`;
+  getDownloadUrl: (id: number): string => {
+    return `${API_BASE_URL}/attachments/${id}/download`;
   },
 
   delete: async (id: number): Promise<void> => {

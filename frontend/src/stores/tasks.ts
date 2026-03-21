@@ -8,7 +8,7 @@ export const useTasksStore = defineStore('tasks', () => {
   const currentTask = ref<TaskDetail | null>(null);
   const totalCount = ref(0);
   const currentPage = ref(1);
-  const pageSize = ref(20);
+  const pageSize = ref(50);
   const loading = ref(false);
   const error = ref<string | null>(null);
 

@@ -3,13 +3,15 @@ import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useTasksStore } from '../stores/tasks';
 import { useAuthStore } from '../stores/auth';
-import { repliesApi } from '../api';
+import { useUsersStore } from '../stores/users';
+import { repliesApi, attachmentsApi } from '../api';
 import type { Reply, TaskStatus, TaskPriority, UpdateTaskRequest } from '../types';
 
 const route = useRoute();
 const router = useRouter();
 const tasksStore = useTasksStore();
 const authStore = useAuthStore();
+const usersStore = useUsersStore();
 
 const taskId = computed(() => Number(route.params.id));
 
@@ -18,6 +20,7 @@ const replyContent = ref('');
 const submitting = ref(false);
 const editingReply = ref<Reply | null>(null);
 const editReplyContent = ref('');
+const uploadingFiles = ref(false);
 
 const editForm = ref({
   title: '',
@@ -30,6 +33,7 @@ const editForm = ref({
 
 onMounted(() => {
   tasksStore.fetchTask(taskId.value);
+  usersStore.fetchUsers();
 });
 
 function canEdit(): boolean {
@@ -125,6 +129,38 @@ async function deleteReply(replyId: number) {
     await tasksStore.fetchTask(taskId.value);
   } catch (error) {
     console.error('Failed to delete reply:', error);
+  }
+}
+
+async function handleFileUpload(event: Event) {
+  const target = event.target as HTMLInputElement;
+  const files = target.files;
+  if (!files || files.length === 0) return;
+
+  uploadingFiles.value = true;
+  try {
+    for (const file of Array.from(files)) {
+      await attachmentsApi.upload(file, taskId.value);
+    }
+    await tasksStore.fetchTask(taskId.value);
+    // Reset the file input
+    target.value = '';
+  } catch (error) {
+    console.error('Failed to upload file:', error);
+    alert('Failed to upload file. Please try again.');
+  } finally {
+    uploadingFiles.value = false;
+  }
+}
+
+async function deleteAttachment(attachmentId: number) {
+  if (!confirm('Are you sure you want to delete this attachment?')) return;
+
+  try {
+    await attachmentsApi.delete(attachmentId);
+    await tasksStore.fetchTask(taskId.value);
+  } catch (error) {
+    console.error('Failed to delete attachment:', error);
   }
 }
 
@@ -229,21 +265,51 @@ function formatDate(date: string) {
         <div class="body-content">{{ tasksStore.currentTask.body }}</div>
       </div>
 
-      <div v-if="tasksStore.currentTask.attachments.length > 0" class="task-attachments">
+      <div class="task-attachments">
         <h3>Attachments</h3>
-        <div class="attachments-list">
-          <a
-            v-for="attachment in tasksStore.currentTask.attachments"
-            :key="attachment.id"
-            :href="`/api/attachments/${attachment.id}/download`"
-            class="attachment-item"
-            target="_blank"
-          >
-            <span class="file-icon">📄</span>
-            <span class="file-name">{{ attachment.fileName }}</span>
-            <span class="file-size">{{ (attachment.fileSize / 1024).toFixed(1) }} KB</span>
-          </a>
+        
+        <!-- Upload Section -->
+        <div class="upload-section">
+          <label class="upload-btn" :class="{ disabled: uploadingFiles }">
+            <input 
+              type="file" 
+              multiple 
+              accept="*/*" 
+              @change="handleFileUpload" 
+              :disabled="uploadingFiles"
+              style="display: none"
+            />
+            {{ uploadingFiles ? 'Uploading...' : '+ Upload Files' }}
+          </label>
         </div>
+
+        <!-- Attachments List -->
+        <div v-if="tasksStore.currentTask.attachments.length > 0" class="attachments-list">
+          <div 
+            v-for="attachment in tasksStore.currentTask.attachments" 
+            :key="attachment.id" 
+            class="attachment-item"
+          >
+            <a
+              :href="`/api/attachments/${attachment.id}/download`"
+              class="attachment-link"
+              target="_blank"
+            >
+              <span class="file-icon">📄</span>
+              <span class="file-name">{{ attachment.fileName }}</span>
+              <span class="file-size">{{ (attachment.fileSize / 1024).toFixed(1) }} KB</span>
+            </a>
+            <button 
+              v-if="canEdit()" 
+              class="delete-attachment-btn" 
+              @click.stop="deleteAttachment(attachment.id)"
+              title="Delete attachment"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+        <div v-else class="no-attachments">No attachments yet</div>
       </div>
 
       <div class="replies-section">
@@ -335,6 +401,15 @@ function formatDate(date: string) {
           <div class="form-group">
             <label for="editDueDate">Due Date</label>
             <input id="editDueDate" v-model="editForm.dueDate" type="date" />
+          </div>
+          <div class="form-group">
+            <label for="editAssignedTo">Assign To</label>
+            <select id="editAssignedTo" v-model="editForm.assignedToUserId">
+              <option :value="undefined">-- Unassigned --</option>
+              <option v-for="user in usersStore.users" :key="user.id" :value="user.id">
+                {{ user.username }}
+              </option>
+            </select>
           </div>
           <div class="modal-actions">
             <button type="button" class="btn btn-secondary" @click="showEditModal = false">
@@ -513,9 +588,40 @@ function formatDate(date: string) {
   font-size: 1.1rem;
 }
 
+.upload-section {
+  margin-bottom: 1rem;
+}
+
+.upload-btn {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.upload-btn:hover:not(.disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.upload-btn.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.no-attachments {
+  color: #666;
+  font-style: italic;
+}
+
 .attachments-list {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 0.5rem;
 }
 
@@ -526,13 +632,35 @@ function formatDate(date: string) {
   padding: 0.5rem 1rem;
   background: #f8f9fa;
   border-radius: 6px;
-  text-decoration: none;
-  color: #333;
-  transition: all 0.2s;
 }
 
-.attachment-item:hover {
-  background: #e9ecef;
+.attachment-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+  color: #333;
+  flex: 1;
+  transition: color 0.2s;
+}
+
+.attachment-link:hover {
+  color: #667eea;
+}
+
+.delete-attachment-btn {
+  background: none;
+  border: none;
+  color: #dc3545;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  transition: background 0.2s;
+}
+
+.delete-attachment-btn:hover {
+  background: #fee2e2;
 }
 
 .file-icon {

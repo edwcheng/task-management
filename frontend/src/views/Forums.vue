@@ -53,7 +53,7 @@ function formatDate(date: string) {
   <div class="forums-page">
     <div class="page-header">
       <h1>Forums</h1>
-      <button v-if="authStore.isAuthenticated" class="btn btn-primary" @click="showCreateModal = true">
+      <button v-if="authStore.isAdmin" class="btn btn-primary" @click="showCreateModal = true">
         + New Forum
       </button>
     </div>
