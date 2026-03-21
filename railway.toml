@@ -1,0 +1,11 @@
+[config]
+# Railway will deploy each service separately
+# Services are defined in separate directories
+
+[[services]]
+name = "backend"
+source = "backend"
+
+[[services]]
+name = "frontend"
+source = "frontend"

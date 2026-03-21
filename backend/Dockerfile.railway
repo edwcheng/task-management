@@ -1,0 +1,29 @@
+# Build stage
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+
+# Copy project files
+COPY ["TaskManagerAPI.csproj", "./"]
+RUN dotnet restore "TaskManagerAPI.csproj"
+
+# Copy source code
+COPY . .
+RUN dotnet publish "TaskManagerAPI.csproj" -c Release -o /app/publish
+
+# Runtime stage
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
+WORKDIR /app
+
+# Create uploads directory
+RUN mkdir -p /app/Uploads
+
+# Copy published app
+COPY --from=build /app/publish .
+
+# Expose port (Railway sets PORT env var)
+EXPOSE 5000
+
+# Set environment variables
+ENV ASPNETCORE_URLS=http://+:5000
+
+ENTRYPOINT ["dotnet", "TaskManagerAPI.dll"]

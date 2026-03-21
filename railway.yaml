@@ -1,0 +1,32 @@
+services:
+  # PostgreSQL Database
+  - name: postgres
+    type: postgresql
+    version: "16"
+
+  # Backend API Service
+  - name: backend
+    source: ./backend
+    build:
+      builder: dockerfile
+      dockerfile: Dockerfile
+    environment:
+      ConnectionStrings__DefaultConnection: ${{postgres.DATABASE_URL}}
+      Jwt__SecretKey: YourProductionSecretKeyChangeThis12345678!
+      Jwt__Issuer: TaskManagerAPI
+      Jwt__Audience: TaskManagerAPI
+      Jwt__ExpirationMinutes: "1440"
+      ASPNETCORE_URLS: http://+:5000
+    healthcheck:
+      path: /api/forums
+      interval: 30s
+      timeout: 10s
+
+  # Frontend Service
+  - name: frontend
+    source: ./frontend
+    build:
+      builder: dockerfile
+      dockerfile: Dockerfile
+    environment:
+      BACKEND_URL: http://${{backend.RAILWAY_PRIVATE_DOMAIN}}:5000

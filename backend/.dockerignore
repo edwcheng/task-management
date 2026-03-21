@@ -1,0 +1,11 @@
+**/bin
+**/obj
+**/node_modules
+**/.git
+**/.gitignore
+**/.vscode
+**/.idea
+**/*.md
+**/*.user
+**/*.suo
+**/Uploads/*
