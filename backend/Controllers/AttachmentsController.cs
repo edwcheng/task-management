@@ -41,6 +41,7 @@ namespace TaskManagerAPI.Controllers
         }
 
         [HttpGet("{id}/download")]
+        [AllowAnonymous]
         public async Task<IActionResult> DownloadAttachment(int id)
         {
             var result = await _attachmentService.DownloadAttachmentAsync(id);
