@@ -48,28 +48,17 @@ namespace TaskManagerAPI.Services
                     return null;
             }
 
-            // Create uploads directory if it doesn't exist
-            var uploadsFolder = Path.Combine(_environment.ContentRootPath, "Uploads");
-            if (!Directory.Exists(uploadsFolder))
-            {
-                Directory.CreateDirectory(uploadsFolder);
-            }
+            // Read file data into memory
+            using var memoryStream = new MemoryStream();
+            await file.CopyToAsync(memoryStream);
+            var fileData = memoryStream.ToArray();
 
-            // Generate unique filename
-            var uniqueFileName = $"{Guid.NewGuid()}_{file.FileName}";
-            var filePath = Path.Combine(uploadsFolder, uniqueFileName);
-
-            // Save file
-            using (var stream = new FileStream(filePath, FileMode.Create))
-            {
-                await file.CopyToAsync(stream);
-            }
-
-            // Create database record
+            // Create database record with file data stored directly
             var attachment = new Attachment
             {
                 FileName = file.FileName,
-                FilePath = filePath,
+                FileData = fileData,
+                FilePath = null, // No longer using filesystem
                 ContentType = file.ContentType,
                 FileSize = file.Length,
                 TaskId = taskId,
@@ -79,6 +68,8 @@ namespace TaskManagerAPI.Services
 
             _context.Attachments.Add(attachment);
             await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Attachment {Id} uploaded successfully ({Size} bytes)", attachment.Id, attachment.FileSize);
 
             return new AttachmentDto
             {
@@ -102,20 +93,23 @@ namespace TaskManagerAPI.Services
                     return null;
                 }
 
-                if (string.IsNullOrEmpty(attachment.FilePath))
+                // First check if file data is stored in database (new method)
+                if (attachment.FileData != null && attachment.FileData.Length > 0)
                 {
-                    _logger.LogWarning("Attachment {Id} has no file path", id);
-                    return null;
+                    _logger.LogInformation("Serving attachment {Id} from database ({Size} bytes)", id, attachment.FileData.Length);
+                    return (attachment.FileData, attachment.ContentType, attachment.FileName);
                 }
 
-                if (!File.Exists(attachment.FilePath))
+                // Fallback to file system (legacy support)
+                if (!string.IsNullOrEmpty(attachment.FilePath) && File.Exists(attachment.FilePath))
                 {
-                    _logger.LogWarning("Attachment file not found on disk: {FilePath}", attachment.FilePath);
-                    return null;
+                    _logger.LogInformation("Serving attachment {Id} from filesystem: {Path}", id, attachment.FilePath);
+                    var data = await File.ReadAllBytesAsync(attachment.FilePath);
+                    return (data, attachment.ContentType, attachment.FileName);
                 }
 
-                var data = await File.ReadAllBytesAsync(attachment.FilePath);
-                return (data, attachment.ContentType, attachment.FileName);
+                _logger.LogWarning("Attachment {Id} has no data (FileData is null and file not found on disk)", id);
+                return null;
             }
             catch (Exception ex)
             {
@@ -143,14 +137,17 @@ namespace TaskManagerAPI.Services
             if (!isAdmin && !isOwner)
                 return false;
 
-            // Delete file
-            if (File.Exists(attachment.FilePath))
+            // Delete file from filesystem if exists (legacy support)
+            if (!string.IsNullOrEmpty(attachment.FilePath) && File.Exists(attachment.FilePath))
             {
                 File.Delete(attachment.FilePath);
             }
 
+            // Remove database record (FileData is deleted automatically)
             _context.Attachments.Remove(attachment);
             await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Attachment {Id} deleted", id);
 
             return true;
         }

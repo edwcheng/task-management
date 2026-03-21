@@ -171,6 +171,32 @@ using (var scope = app.Services.CreateScope())
         await dbContext.Database.EnsureCreatedAsync();
         logger.LogInformation("Database tables created/verified successfully");
         
+        // Migration: Add FileData column to Attachments if it doesn't exist (for Railway compatibility)
+        try
+        {
+            using var conn = dbContext.Database.GetDbConnection();
+            await conn.OpenAsync();
+            using var checkCmd = conn.CreateCommand();
+            checkCmd.CommandText = @"
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'Attachments' AND column_name = 'FileData'";
+            var fileDataColumn = await checkCmd.ExecuteScalarAsync();
+            
+            if (fileDataColumn == null)
+            {
+                logger.LogInformation("Adding FileData column to Attachments table for database file storage...");
+                using var alterCmd = conn.CreateCommand();
+                alterCmd.CommandText = "ALTER TABLE \"Attachments\" ADD COLUMN \"FileData\" bytea NULL";
+                await alterCmd.ExecuteNonQueryAsync();
+                logger.LogInformation("FileData column added successfully");
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning("Could not check/add FileData column: {Message}", ex.Message);
+        }
+        
         // Seed admin user if not exists
         if (!await dbContext.Users.AnyAsync(u => u.Username == "admin"))
         {
