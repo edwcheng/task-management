@@ -8,14 +8,21 @@ using TaskManagerAPI.Data;
 using TaskManagerAPI.Models;
 using TaskManagerAPI.Services;
 
+Console.WriteLine("=== Application Starting ===");
+
 var builder = WebApplication.CreateBuilder(args);
+
+Console.WriteLine("=== Building configuration ===");
 
 // Configure port - always use 5000 for Railway private networking
 // Ignore Railway's PORT variable to ensure consistent port for internal communication
 builder.WebHost.ConfigureKestrel(options =>
 {
+    Console.WriteLine("=== Configuring Kestrel on port 5000 ===");
     options.ListenAnyIP(5000);
 });
+
+Console.WriteLine("=== Adding controllers ===");
 
 // Add services to the container
 builder.Services.AddControllers()
@@ -25,12 +32,18 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     });
 
+Console.WriteLine("=== Configuring PostgreSQL ===");
+
 // Configure PostgreSQL
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? "Host=localhost;Database=taskmanager;Username=postgres;Password=postgres";
 
+Console.WriteLine($"=== Connection string: {connectionString.Substring(0, Math.Min(50, connectionString.Length))}... ===");
+
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString));
+
+Console.WriteLine("=== Registering services ===");
 
 // Register services
 builder.Services.AddScoped<IJwtService, JwtService>();
@@ -40,6 +53,8 @@ builder.Services.AddScoped<ITaskService, TaskService>();
 builder.Services.AddScoped<IReplyService, ReplyService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAttachmentService, AttachmentService>();
+
+Console.WriteLine("=== Configuring JWT ===");
 
 // Configure JWT Authentication
 var jwtSecretKey = builder.Configuration["Jwt:SecretKey"] ?? "DefaultSecretKeyForDevelopment12345678!";
@@ -136,23 +151,36 @@ using (var scope = app.Services.CreateScope())
     
     try
     {
-        logger.LogInformation("Starting database initialization...");
+        logger.LogInformation("=== STEP 1: Starting database initialization ===");
+        Console.WriteLine("=== STEP 1: Starting database initialization ===");
         
         // Get connection string and create database if it doesn't exist
         var dbConnectionString = configuration.GetConnectionString("DefaultConnection")
             ?? "Host=localhost;Database=taskmanager;Username=postgres;Password=postgres";
+        
+        logger.LogInformation("=== STEP 2: Got connection string ===");
+        Console.WriteLine("=== STEP 2: Got connection string ===");
         
         // Parse connection string to get database name and server info
         var builder2 = new Npgsql.NpgsqlConnectionStringBuilder(dbConnectionString);
         var dbName = builder2.Database;
         builder2.Database = "postgres"; // Connect to default database first
         
+        logger.LogInformation("=== STEP 3: Connecting to postgres database ===");
+        Console.WriteLine("=== STEP 3: Connecting to postgres database ===");
+        
         using (var connection = new Npgsql.NpgsqlConnection(builder2.ToString()))
         {
             await connection.OpenAsync();
+            logger.LogInformation("=== STEP 4: Connection opened ===");
+            Console.WriteLine("=== STEP 4: Connection opened ===");
+            
             using var cmd = connection.CreateCommand();
             cmd.CommandText = $"SELECT 1 FROM pg_database WHERE datname = '{dbName}'";
             var exists = await cmd.ExecuteScalarAsync();
+            
+            logger.LogInformation("=== STEP 5: Database existence checked ===");
+            Console.WriteLine($"=== STEP 5: Database existence checked, exists={exists} ===");
             
             if (exists == null)
             {
@@ -167,9 +195,14 @@ using (var scope = app.Services.CreateScope())
             }
         }
         
+        logger.LogInformation("=== STEP 6: Calling EnsureCreatedAsync ===");
+        Console.WriteLine("=== STEP 6: Calling EnsureCreatedAsync ===");
+        
         // Now create tables using EF Core
         await dbContext.Database.EnsureCreatedAsync();
-        logger.LogInformation("Database tables created/verified successfully");
+        
+        logger.LogInformation("=== STEP 7: EnsureCreatedAsync completed ===");
+        Console.WriteLine("=== STEP 7: EnsureCreatedAsync completed ===");
         
         // Seed admin user if not exists
         if (!await dbContext.Users.AnyAsync(u => u.Username == "admin"))
@@ -193,19 +226,33 @@ using (var scope = app.Services.CreateScope())
         {
             logger.LogInformation("Admin user already exists, skipping seed");
         }
+        
+        logger.LogInformation("=== STEP 8: Database initialization complete ===");
+        Console.WriteLine("=== STEP 8: Database initialization complete ===");
     }
     catch (Exception ex)
     {
         logger.LogError(ex, "Database initialization error: {Message}", ex.Message);
+        Console.WriteLine($"=== DATABASE ERROR: {ex.Message} ===");
+        Console.WriteLine($"=== STACK TRACE: {ex.StackTrace} ===");
         // Don't throw - let the app start anyway so we can see logs
     }
 }
 
+Console.WriteLine("=== STEP 9: Configuring middleware ===");
+
 app.UseCors("AllowAll");
+
+Console.WriteLine("=== STEP 10: CORS configured ===");
 
 app.UseAuthentication();
 app.UseAuthorization();
 
+Console.WriteLine("=== STEP 11: Auth configured ===");
+
 app.MapControllers();
+
+Console.WriteLine("=== STEP 12: Controllers mapped ===");
+Console.WriteLine("=== Application starting - listening on port 5000 ===");
 
 app.Run();
