@@ -58,6 +58,9 @@ const router = createRouter({
 router.beforeEach((to, _from, next) => {
   const authStore = useAuthStore();
 
+  // Check if token has expired and logout if so
+  authStore.checkTokenExpiry();
+
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     next({ name: 'Login', query: { redirect: to.fullPath } });
   } else if (to.meta.guest && authStore.isAuthenticated) {
