@@ -1,0 +1,31 @@
+# .NET build artifacts
+bin/
+obj/
+
+# Node modules
+node_modules/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vs/
+.vscode/
+*.user
+*.suo
+
+# Build outputs
+dist/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# AI assistant internal memory
+worklog.md
