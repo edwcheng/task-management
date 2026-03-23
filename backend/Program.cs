@@ -8,6 +8,11 @@ using TaskManagerAPI.Data;
 using TaskManagerAPI.Models;
 using TaskManagerAPI.Services;
 
+// Fix for Npgsql 6+ DateTime timezone handling
+// PostgreSQL timestamp with time zone requires UTC, but .NET DateTime can be Local/Unspecified
+// This enables legacy behavior to allow non-UTC DateTime values (for local development)
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+
 Console.WriteLine("=== Application Starting ===");
 
 var builder = WebApplication.CreateBuilder(args);
